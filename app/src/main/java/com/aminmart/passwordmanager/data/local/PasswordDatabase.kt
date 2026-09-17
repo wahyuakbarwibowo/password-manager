@@ -7,8 +7,10 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 
 /**
@@ -29,16 +31,13 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         onCreate(db)
     }
 
+    // Bumped after every write to the passwords table so getAllPasswords() re-queries.
+    private val passwordsVersion = MutableStateFlow(0)
+
+    private fun notifyPasswordsChanged() = passwordsVersion.update { it + 1 }
+
     // Password operations
-    fun getAllPasswords(): Flow<List<PasswordEntity>> = flow {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery("SELECT * FROM passwords ORDER BY updatedAt DESC", null)
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        emit(list)
-    }.flowOn(Dispatchers.IO)
+    fun getAllPasswords(): Flow<List<PasswordEntity>> = passwordsVersion.map { getAllPasswordsList() }
 
     suspend fun getAllPasswordsList(): List<PasswordEntity> = withContext(Dispatchers.IO) {
         val list = mutableListOf<PasswordEntity>()
@@ -80,7 +79,7 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             put("createdAt", password.createdAt)
             put("updatedAt", password.updatedAt)
         }
-        database.insert(TABLE_PASSWORDS, null, values)
+        database.insert(TABLE_PASSWORDS, null, values).also { notifyPasswordsChanged() }
     }
 
     suspend fun updatePassword(password: PasswordEntity) = withContext(Dispatchers.IO) {
@@ -97,17 +96,17 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             put("updatedAt", password.updatedAt)
         }
         database.update(TABLE_PASSWORDS, values, "id = ?", arrayOf(password.id.toString()))
-        Unit
-    }
-
-    suspend fun deletePassword(password: PasswordEntity) = withContext(Dispatchers.IO) {
-        database.delete(TABLE_PASSWORDS, "id = ?", arrayOf(password.id.toString()))
-        Unit
+        notifyPasswordsChanged()
     }
 
     suspend fun deletePasswordById(id: Long) = withContext(Dispatchers.IO) {
         database.delete(TABLE_PASSWORDS, "id = ?", arrayOf(id.toString()))
-        Unit
+        notifyPasswordsChanged()
+    }
+
+    suspend fun deleteAllPasswords() = withContext(Dispatchers.IO) {
+        database.delete(TABLE_PASSWORDS, null, null)
+        notifyPasswordsChanged()
     }
 
     // Settings operations

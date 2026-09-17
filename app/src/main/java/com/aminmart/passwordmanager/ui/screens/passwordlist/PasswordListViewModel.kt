@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.aminmart.passwordmanager.data.repository.PasswordRepository
 import com.aminmart.passwordmanager.domain.model.PasswordEntry
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -13,8 +17,7 @@ data class PasswordListUiState(
     val passwords: List<PasswordEntry> = emptyList(),
     val isLoading: Boolean = true,
     val searchQuery: String = "",
-    val errorMessage: String? = null,
-    val refreshTrigger: Int = 0
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -26,39 +29,21 @@ class PasswordListViewModel @Inject constructor(
     val uiState: StateFlow<PasswordListUiState> = _uiState.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
-    private var loadJob: kotlinx.coroutines.Job? = null
 
     init {
-        loadPasswords()
-    }
-
-    fun loadPasswords() {
-        loadJob?.cancel()
-        loadJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-
-            combine(
-                passwordRepository.getAllPasswords(),
-                _searchQuery
-            ) { passwords, query ->
-                if (query.isBlank()) {
-                    passwords
-                } else {
-                    passwords.filter {
-                        it.title.contains(query, ignoreCase = true) ||
+        viewModelScope.launch {
+            // The repository flow re-emits after every write, so the list stays current
+            // across add/edit/delete/import without manual refreshes.
+            combine(passwordRepository.getAllPasswords(), _searchQuery) { passwords, query ->
+                if (query.isBlank()) passwords else passwords.filter {
+                    it.title.contains(query, ignoreCase = true) ||
                         it.username.contains(query, ignoreCase = true) ||
                         it.website.contains(query, ignoreCase = true)
-                    }
                 }
             }.catch { e ->
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = e.message
-                )
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = e.message)
             }.collect { passwords ->
-                _uiState.value = _uiState.value.copy(
-                    passwords = passwords,
-                    isLoading = false
-                )
+                _uiState.value = _uiState.value.copy(passwords = passwords, isLoading = false)
             }
         }
     }
@@ -66,13 +51,6 @@ class PasswordListViewModel @Inject constructor(
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query
         _uiState.value = _uiState.value.copy(searchQuery = query)
-    }
-
-    fun refresh() {
-        // Increment refresh trigger to force reload
-        _uiState.value = _uiState.value.copy(
-            refreshTrigger = _uiState.value.refreshTrigger + 1
-        )
     }
 
     fun clearError() {

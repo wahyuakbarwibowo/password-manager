@@ -35,18 +35,6 @@ fun PasswordListScreen(
         }
     }
 
-    // Refresh passwords when entering the screen
-    LaunchedEffect(Unit) {
-        viewModel.refresh()
-    }
-
-    // Refresh passwords when returning from other screens (e.g., after adding/editing)
-    LaunchedEffect(uiState.refreshTrigger) {
-        if (uiState.refreshTrigger > 0) {
-            viewModel.loadPasswords()
-        }
-    }
-    
     Scaffold(
         topBar = {
             TopAppBar(

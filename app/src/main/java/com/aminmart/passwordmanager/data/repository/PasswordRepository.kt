@@ -120,11 +120,7 @@ class PasswordRepository @Inject constructor(
     /**
      * Delete all passwords.
      */
-    suspend fun deleteAllPasswords() {
-        database.getAllPasswordsList().forEach { entity ->
-            database.deletePassword(entity)
-        }
-    }
+    suspend fun deleteAllPasswords() = database.deleteAllPasswords()
 
     /**
      * Decrypt a password entity to a domain model.
