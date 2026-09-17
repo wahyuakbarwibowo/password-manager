@@ -124,6 +124,9 @@ class PasswordRepository @Inject constructor(
 
     /**
      * Decrypt a password entity to a domain model.
+     * @throws DecryptionFailedException if the stored secret cannot be decrypted
+     *   (e.g. the Keystore key was lost). Callers must surface this rather than
+     *   showing an empty password as if that were the stored value.
      */
     private fun decryptPassword(entity: PasswordEntity): PasswordEntry {
         val (password, notes) = if (!entity.ciphertext.isNullOrEmpty() && !entity.nonce.isNullOrEmpty()) {
@@ -134,7 +137,7 @@ class PasswordRepository @Inject constructor(
                 )
                 payload.password to payload.notes
             } catch (e: Exception) {
-                "" to ""
+                throw DecryptionFailedException(entity.title, e)
             }
         } else {
             "" to ""
@@ -165,3 +168,8 @@ private fun com.aminmart.passwordmanager.domain.model.PasswordCategory.toEntityC
 private fun PasswordCategory.toDomainCategory(): com.aminmart.passwordmanager.domain.model.PasswordCategory {
     return com.aminmart.passwordmanager.domain.model.PasswordCategory.valueOf(this.name)
 }
+
+class DecryptionFailedException(title: String, cause: Throwable) : Exception(
+    "Could not decrypt \"$title\". The device encryption key may have changed; restore from a backup.",
+    cause
+)

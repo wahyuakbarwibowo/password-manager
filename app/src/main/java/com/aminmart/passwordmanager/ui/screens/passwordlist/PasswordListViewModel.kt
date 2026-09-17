@@ -58,12 +58,17 @@ class PasswordListViewModel @Inject constructor(
      */
     fun copyPassword(id: Long, onReady: (String) -> Unit) {
         viewModelScope.launch {
-            val entry = runCatching { passwordRepository.getPasswordById(id) }.getOrNull()
-            if (entry == null || entry.password.isEmpty()) {
-                _uiState.value = _uiState.value.copy(errorMessage = "Could not read password")
-            } else {
-                onReady(entry.password)
-            }
+            runCatching { passwordRepository.getPasswordById(id) }
+                .onSuccess { entry ->
+                    if (entry == null) {
+                        _uiState.value = _uiState.value.copy(errorMessage = "Password not found")
+                    } else {
+                        onReady(entry.password)
+                    }
+                }
+                .onFailure { e ->
+                    _uiState.value = _uiState.value.copy(errorMessage = e.message ?: "Could not read password")
+                }
         }
     }
 
