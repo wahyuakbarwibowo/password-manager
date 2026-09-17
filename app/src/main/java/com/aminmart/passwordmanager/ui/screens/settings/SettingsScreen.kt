@@ -15,7 +15,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import com.aminmart.passwordmanager.data.repository.ImportMode
+import com.aminmart.passwordmanager.ui.components.PasswordTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -440,12 +443,14 @@ private fun PasswordVerificationDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(description)
-                OutlinedTextField(
+                PasswordTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Master Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Master Password",
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (password.isNotEmpty()) onVerify(password)
+                    })
                 )
             }
         },
@@ -482,26 +487,24 @@ private fun ChangePasswordDialog(
         title = { Text("Change Master Password") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
+                PasswordTextField(
                     value = oldPassword,
                     onValueChange = { oldPassword = it },
-                    label = { Text("Old Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Old Password"
                 )
-                OutlinedTextField(
+                PasswordTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("New Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "New Password"
                 )
-                OutlinedTextField(
+                PasswordTextField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    label = { Text("Confirm New Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Confirm New Password",
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = {
+                        onChangePassword(oldPassword, newPassword, confirmPassword)
+                    })
                 )
             }
         },
