@@ -32,6 +32,27 @@ fun PasswordDetailScreen(
     LaunchedEffect(passwordId) {
         viewModel.loadPassword(passwordId)
     }
+
+    LaunchedEffect(uiState.deleted) {
+        if (uiState.deleted) onNavigateBack()
+    }
+
+    if (uiState.showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDelete,
+            title = { Text("Delete Password?") },
+            text = { Text("\"${uiState.password?.title.orEmpty()}\" will be permanently deleted.") },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::deletePassword,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDelete) { Text("Cancel") }
+            }
+        )
+    }
     
     Scaffold(
         topBar = {
@@ -45,6 +66,9 @@ fun PasswordDetailScreen(
                 actions = {
                     IconButton(onClick = onNavigateToEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                    IconButton(onClick = viewModel::requestDelete, enabled = uiState.password != null) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete")
                     }
                 }
             )
