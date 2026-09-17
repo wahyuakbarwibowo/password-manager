@@ -28,18 +28,18 @@ Release builds produce a single universal APK with R8 minify + resource shrink (
 
 Layered, dependencies point inward; Hilt wires everything (`@HiltAndroidApp` on `PasswordManagerApplication`, `@AndroidEntryPoint` on `MainActivity`).
 
-- **data/local** — Persistence. `PasswordDatabase` is a hand-written `SQLiteOpenHelper` (NOT Room — README is stale on this; Room deps in `libs.versions.toml` are unused). Two tables: `passwords`, `settings` (key/value). DB version 1; `onUpgrade` drops + recreates (destructive). `PasswordEntity`, `SettingsEntity`, `PasswordCategory` enum live here.
+- **data/local** — Persistence. `PasswordDatabase` is a hand-written `SQLiteOpenHelper` (NOT Room). All queries run on `Dispatchers.IO`. `getAllPasswords()` is reactive: a version counter is bumped after every write to `passwords`, so the flow re-queries on its own — no manual refresh needed. Two tables: `passwords`, `settings` (key/value). DB version 1; `onUpgrade` drops + recreates (destructive). `PasswordEntity`, `SettingsEntity`, `PasswordCategory` enum live here.
 - **data/security** — Crypto services, each `@Singleton @Inject`:
   - `EncryptionService` — AES-256-GCM via Android Keystore (hardware-backed key, unique nonce per op).
   - `SecretEncryptionService` — wraps EncryptionService to encrypt the `{password, notes}` payload → ciphertext + nonce columns.
   - `PasswordHashingService` — PBKDF2WithHmacSHA256, 100k iterations, 256-bit salt/hash. Master-password verification only.
   - `BiometricAuthService` — BiometricPrompt wrapper.
   - `PasswordGeneratorService` — random password generation + strength.
-- **data/repository** — `PasswordRepository` (CRUD + encrypt/decrypt, maps Entity↔domain `PasswordEntry`), `VaultRepository` (vault init state + master-password hashing via settings table), `BackupService` (encrypted export/import).
+- **data/repository** — `PasswordRepository` (CRUD + encrypt/decrypt, maps Entity↔domain `PasswordEntry`; the list flow emits rows with empty `password`/`notes`, only `getPasswordById` decrypts), `VaultRepository` (vault init state + master-password hashing via settings table), `BackupService` (encrypted export/import).
 - **domain/model** — `PasswordEntry`, `CreatePasswordInput`, `UpdatePasswordInput`. Plaintext domain types; repos do the crypto boundary.
-- **di** — `DatabaseModule` (provides `PasswordDatabase` singleton), `SharedPreferencesModule`.
+- **di** — `DatabaseModule` (provides `PasswordDatabase` singleton).
 - **ui/screens/<feature>** — Each feature = `XxxScreen` (Compose) + `XxxViewModel` (`@HiltViewModel`, exposes state via `StateFlow`). Features: `auth`, `passwordlist`, `passworddetail`, `addeditpassword` (shared add+edit), `settings`.
-- **ui/navigation** — `Screen` sealed class holds routes (`PasswordDetail`/`EditPassword` take `passwordId` arg via `createRoute`). `AppNavigation` is the NavHost; `startDestination` chosen by `VaultRepository.isVaultInitialized()` (Auth vs list flow).
+- **ui/navigation** — `Screen` sealed class holds routes (`PasswordDetail`/`EditPassword` take `passwordId` arg via `createRoute`). `AppNavigation` is the NavHost; start is always `Auth`, which switches between setup/unlock based on `VaultRepository.isVaultInitialized()`. Biometric unlock is only offered (and auto-prompted) when the user enabled it in Settings.
 
 ### Data flow
 
