@@ -172,12 +172,7 @@ class BackupService @Inject constructor(
             var skipped = 0
 
             when (mode) {
-                ImportMode.OVERWRITE -> {
-                    // Delete all existing passwords
-                    database.getAllPasswordsList().forEach { entity ->
-                        database.deletePassword(entity)
-                    }
-                }
+                ImportMode.OVERWRITE -> database.deleteAllPasswords()
                 ImportMode.MERGE -> {
                     // Will skip duplicates
                 }

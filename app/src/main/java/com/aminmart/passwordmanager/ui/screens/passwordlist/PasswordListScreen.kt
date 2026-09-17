@@ -17,6 +17,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aminmart.passwordmanager.domain.model.PasswordEntry
 import com.aminmart.passwordmanager.ui.components.PasswordCategoryBadge
 import com.aminmart.passwordmanager.ui.components.copyToClipboard
+import com.aminmart.passwordmanager.ui.components.icon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,26 +28,17 @@ fun PasswordListScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.errorMessage) {
-        if (uiState.errorMessage != null) {
-            viewModel.clearError()
-        }
+        val message = uiState.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearError()
     }
 
-    // Refresh passwords when entering the screen
-    LaunchedEffect(Unit) {
-        viewModel.refresh()
-    }
-
-    // Refresh passwords when returning from other screens (e.g., after adding/editing)
-    LaunchedEffect(uiState.refreshTrigger) {
-        if (uiState.refreshTrigger > 0) {
-            viewModel.loadPasswords()
-        }
-    }
-    
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Aminmart Password Manager") },
@@ -112,7 +104,12 @@ fun PasswordListScreen(
                     items(uiState.passwords, key = { it.id }) { password ->
                         PasswordListItem(
                             password = password,
-                            onClick = { onNavigateToDetail(password.id) }
+                            onClick = { onNavigateToDetail(password.id) },
+                            onCopyPassword = {
+                                viewModel.copyPassword(password.id) { plaintext ->
+                                    copyToClipboard(context, plaintext, "Password", isSensitive = true)
+                                }
+                            }
                         )
                     }
                 }
@@ -156,10 +153,9 @@ private fun EmptyPasswordList(isSearching: Boolean, modifier: Modifier = Modifie
 @Composable
 private fun PasswordListItem(
     password: PasswordEntry,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCopyPassword: () -> Unit
 ) {
-    val context = LocalContext.current
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -181,7 +177,7 @@ private fun PasswordListItem(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = getCategoryIcon(password.category),
+                        text = password.category.icon,
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -211,11 +207,7 @@ private fun PasswordListItem(
             PasswordCategoryBadge(category = password.category)
 
             // Quick copy — the most common action, without opening the detail screen
-            IconButton(
-                onClick = {
-                    copyToClipboard(context, password.password, "Password", isSensitive = true)
-                }
-            ) {
+            IconButton(onClick = onCopyPassword) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
                     contentDescription = "Copy password",
@@ -223,17 +215,5 @@ private fun PasswordListItem(
                 )
             }
         }
-    }
-}
-
-private fun getCategoryIcon(category: com.aminmart.passwordmanager.domain.model.PasswordCategory): String {
-    return when (category) {
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.SOCIAL -> "📱"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.EMAIL -> "📧"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.SHOPPING -> "🛒"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.FINANCE -> "💰"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.ENTERTAINMENT -> "🎬"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.WORK -> "💼"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.OTHER -> "🔐"
     }
 }

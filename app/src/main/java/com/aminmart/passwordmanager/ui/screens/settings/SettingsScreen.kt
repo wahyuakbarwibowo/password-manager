@@ -1,7 +1,5 @@
 package com.aminmart.passwordmanager.ui.screens.settings
 
-import android.app.Activity
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -16,10 +14,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.ImeAction
 import com.aminmart.passwordmanager.data.repository.ImportMode
-import java.io.File
+import com.aminmart.passwordmanager.ui.components.PasswordTextField
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,8 +29,19 @@ fun SettingsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val activity = context as? Activity
     var showAutoLockDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.statusMessage) {
+        val message = uiState.statusMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
+        viewModel.clearStatusMessage()
+    }
+
+    // Once the vault is wiped there is nothing to go "back" to; restart at setup.
+    LaunchedEffect(uiState.vaultDeleted) {
+        if (uiState.vaultDeleted) onLockVault()
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -57,14 +67,8 @@ fun SettingsScreen(
         uri?.let { viewModel.generateRecoveryKey(it) }
     }
 
-    // Biometric authentication launcher
-    val biometricLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        // Handle biometric authentication result if needed
-    }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -82,6 +86,10 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (uiState.isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             // Security section
             SettingsSection(title = "Security") {
                 // Biometric toggle
@@ -288,10 +296,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        viewModel.deleteAllData()
-                        onNavigateBack()
-                    },
+                    onClick = viewModel::deleteAllData,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
@@ -305,23 +310,6 @@ fun SettingsScreen(
                 }
             }
         )
-    }
-
-    // Status messages
-    uiState.statusMessage?.let { message ->
-        Snackbar(
-            modifier = Modifier.padding(16.dp),
-            action = {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        ) {
-            Text(message)
-        }
     }
 }
 
@@ -452,12 +440,14 @@ private fun PasswordVerificationDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(description)
-                OutlinedTextField(
+                PasswordTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Master Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Master Password",
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = {
+                        if (password.isNotEmpty()) onVerify(password)
+                    })
                 )
             }
         },
@@ -494,26 +484,24 @@ private fun ChangePasswordDialog(
         title = { Text("Change Master Password") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
+                PasswordTextField(
                     value = oldPassword,
                     onValueChange = { oldPassword = it },
-                    label = { Text("Old Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Old Password"
                 )
-                OutlinedTextField(
+                PasswordTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("New Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "New Password"
                 )
-                OutlinedTextField(
+                PasswordTextField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    label = { Text("Confirm New Password") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    label = "Confirm New Password",
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = {
+                        onChangePassword(oldPassword, newPassword, confirmPassword)
+                    })
                 )
             }
         },

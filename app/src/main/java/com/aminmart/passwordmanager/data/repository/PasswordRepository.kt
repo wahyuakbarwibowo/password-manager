@@ -7,8 +7,10 @@ import com.aminmart.passwordmanager.data.security.SecretEncryptionService
 import com.aminmart.passwordmanager.domain.model.CreatePasswordInput
 import com.aminmart.passwordmanager.domain.model.PasswordEntry
 import com.aminmart.passwordmanager.domain.model.UpdatePasswordInput
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,45 +25,35 @@ class PasswordRepository @Inject constructor(
 ) {
 
     /**
-     * Get all passwords as a Flow.
-     * Passwords are decrypted when read.
+     * Observe all entries for list display. Secrets are NOT decrypted here:
+     * `password` and `notes` are empty. Use [getPasswordById] for the full
+     * entry so plaintext only exists for the one entry being viewed/copied.
      */
     fun getAllPasswords(): Flow<List<PasswordEntry>> {
         return database.getAllPasswords().map { entities ->
-            entities.map { decryptPassword(it) }
-        }
-    }
-
-    /**
-     * Search passwords by query.
-     */
-    fun searchPasswords(query: String): Flow<List<PasswordEntry>> {
-        val searchQuery = "%$query%"
-        return database.searchPasswords(searchQuery).map { entities ->
-            entities.map { decryptPassword(it) }
+            entities.map { toEntry(it, password = "", notes = "") }
         }
     }
 
     /**
      * Get all passwords as a decrypted snapshot (for backup export).
      */
-    suspend fun getAllPasswordsList(): List<PasswordEntry> {
-        return database.getAllPasswordsList().map { decryptPassword(it) }
+    suspend fun getAllPasswordsList(): List<PasswordEntry> = withContext(Dispatchers.IO) {
+        database.getAllPasswordsList().map { decryptPassword(it) }
     }
 
     /**
      * Get a password by ID.
      */
-    suspend fun getPasswordById(id: Long): PasswordEntry? {
-        val entity = database.getPasswordById(id)
-        return entity?.let { decryptPassword(it) }
+    suspend fun getPasswordById(id: Long): PasswordEntry? = withContext(Dispatchers.IO) {
+        database.getPasswordById(id)?.let { decryptPassword(it) }
     }
 
     /**
      * Create a new password entry.
      * Password and notes are encrypted before storage.
      */
-    suspend fun createPassword(input: CreatePasswordInput): Long {
+    suspend fun createPassword(input: CreatePasswordInput): Long = withContext(Dispatchers.IO) {
         val encryptedSecrets = secretEncryptionService.encryptSecrets(
             password = input.password,
             notes = input.notes
@@ -81,13 +73,13 @@ class PasswordRepository @Inject constructor(
             updatedAt = input.updatedAt ?: System.currentTimeMillis()
         )
 
-        return database.insertPassword(entity)
+        database.insertPassword(entity)
     }
 
     /**
      * Update an existing password entry.
      */
-    suspend fun updatePassword(input: UpdatePasswordInput) {
+    suspend fun updatePassword(input: UpdatePasswordInput) = withContext(Dispatchers.IO) {
         val existing = database.getPasswordById(input.id)
             ?: throw IllegalArgumentException("Password not found with id: ${input.id}")
 
@@ -128,11 +120,7 @@ class PasswordRepository @Inject constructor(
     /**
      * Delete all passwords.
      */
-    suspend fun deleteAllPasswords() {
-        database.getAllPasswordsList().forEach { entity ->
-            database.deletePassword(entity)
-        }
-    }
+    suspend fun deleteAllPasswords() = database.deleteAllPasswords()
 
     /**
      * Decrypt a password entity to a domain model.
@@ -151,19 +139,20 @@ class PasswordRepository @Inject constructor(
         } else {
             "" to ""
         }
-
-        return PasswordEntry(
-            id = entity.id,
-            title = entity.title,
-            username = entity.username,
-            password = password,
-            website = entity.website,
-            notes = notes,
-            category = entity.category.toDomainCategory(),
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
-        )
+        return toEntry(entity, password, notes)
     }
+
+    private fun toEntry(entity: PasswordEntity, password: String, notes: String) = PasswordEntry(
+        id = entity.id,
+        title = entity.title,
+        username = entity.username,
+        password = password,
+        website = entity.website,
+        notes = notes,
+        category = entity.category.toDomainCategory(),
+        createdAt = entity.createdAt,
+        updatedAt = entity.updatedAt
+    )
 }
 
 /**

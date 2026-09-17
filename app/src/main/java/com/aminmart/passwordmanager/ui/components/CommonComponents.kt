@@ -41,6 +41,7 @@ fun PasswordTextField(
     placeholder: String? = null,
     isError: Boolean = false,
     errorMessage: String? = null,
+    imeAction: ImeAction = ImeAction.Next,
     keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
@@ -54,7 +55,7 @@ fun PasswordTextField(
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Next
+                imeAction = imeAction
             ),
             keyboardActions = keyboardActions,
             singleLine = true,

@@ -5,8 +5,13 @@ import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 /**
  * Simple SQLite database helper for password manager.
@@ -26,28 +31,25 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         onCreate(db)
     }
 
+    // Bumped after every write to the passwords table so getAllPasswords() re-queries.
+    private val passwordsVersion = MutableStateFlow(0)
+
+    private fun notifyPasswordsChanged() = passwordsVersion.update { it + 1 }
+
     // Password operations
-    fun getAllPasswords(): Flow<List<PasswordEntity>> = flow {
+    fun getAllPasswords(): Flow<List<PasswordEntity>> = passwordsVersion.map { getAllPasswordsList() }
+
+    suspend fun getAllPasswordsList(): List<PasswordEntity> = withContext(Dispatchers.IO) {
         val list = mutableListOf<PasswordEntity>()
         val cursor = database.rawQuery("SELECT * FROM passwords ORDER BY updatedAt DESC", null)
         while (cursor.moveToNext()) {
             list.add(cursorToPasswordEntity(cursor))
         }
         cursor.close()
-        emit(list)
+        list
     }
 
-    suspend fun getAllPasswordsList(): List<PasswordEntity> {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery("SELECT * FROM passwords ORDER BY updatedAt DESC", null)
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        return list
-    }
-
-    suspend fun getPasswordById(id: Long): PasswordEntity? {
+    suspend fun getPasswordById(id: Long): PasswordEntity? = withContext(Dispatchers.IO) {
         val cursor = database.query(
             TABLE_PASSWORDS,
             null,
@@ -60,23 +62,10 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             entity = cursorToPasswordEntity(cursor)
         }
         cursor.close()
-        return entity
+        entity
     }
 
-    fun searchPasswords(query: String): Flow<List<PasswordEntity>> = flow {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery(
-            "SELECT * FROM passwords WHERE title LIKE ? OR username LIKE ? OR website LIKE ? OR category LIKE ? ORDER BY updatedAt DESC",
-            arrayOf("%$query%", "%$query%", "%$query%", "%$query%")
-        )
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        emit(list)
-    }
-
-    suspend fun insertPassword(password: PasswordEntity): Long {
+    suspend fun insertPassword(password: PasswordEntity): Long = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
             put("title", password.title)
             put("username", password.username)
@@ -90,10 +79,10 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             put("createdAt", password.createdAt)
             put("updatedAt", password.updatedAt)
         }
-        return database.insert(TABLE_PASSWORDS, null, values)
+        database.insert(TABLE_PASSWORDS, null, values).also { notifyPasswordsChanged() }
     }
 
-    suspend fun updatePassword(password: PasswordEntity) {
+    suspend fun updatePassword(password: PasswordEntity) = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
             put("title", password.title)
             put("username", password.username)
@@ -107,31 +96,21 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             put("updatedAt", password.updatedAt)
         }
         database.update(TABLE_PASSWORDS, values, "id = ?", arrayOf(password.id.toString()))
+        notifyPasswordsChanged()
     }
 
-    suspend fun deletePassword(password: PasswordEntity) {
-        database.delete(TABLE_PASSWORDS, "id = ?", arrayOf(password.id.toString()))
-    }
-
-    suspend fun deletePasswordById(id: Long) {
+    suspend fun deletePasswordById(id: Long) = withContext(Dispatchers.IO) {
         database.delete(TABLE_PASSWORDS, "id = ?", arrayOf(id.toString()))
+        notifyPasswordsChanged()
     }
 
-    suspend fun getAllEncryptedPasswords(): List<PasswordEntity> {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery(
-            "SELECT * FROM passwords WHERE ciphertext IS NOT NULL AND nonce IS NOT NULL",
-            null
-        )
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        return list
+    suspend fun deleteAllPasswords() = withContext(Dispatchers.IO) {
+        database.delete(TABLE_PASSWORDS, null, null)
+        notifyPasswordsChanged()
     }
 
     // Settings operations
-    suspend fun getSetting(key: String): SettingsEntity? {
+    suspend fun getSetting(key: String): SettingsEntity? = withContext(Dispatchers.IO) {
         val cursor = database.query(
             TABLE_SETTINGS,
             null,
@@ -144,26 +123,28 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             entity = cursorToSettingsEntity(cursor)
         }
         cursor.close()
-        return entity
+        entity
     }
 
     fun getSettingFlow(key: String): Flow<SettingsEntity?> = flow {
         emit(getSetting(key))
     }
 
-    suspend fun saveSetting(setting: SettingsEntity) {
+    suspend fun saveSetting(setting: SettingsEntity) = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
             put("key", setting.key)
             put("value", setting.value)
         }
         database.insertWithOnConflict(TABLE_SETTINGS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        Unit
     }
 
-    suspend fun deleteSetting(key: String) {
+    suspend fun deleteSetting(key: String) = withContext(Dispatchers.IO) {
         database.delete(TABLE_SETTINGS, "key = ?", arrayOf(key))
+        Unit
     }
 
-    suspend fun hasSetting(key: String): Boolean {
+    suspend fun hasSetting(key: String): Boolean = withContext(Dispatchers.IO) {
         val cursor = database.rawQuery(
             "SELECT EXISTS(SELECT 1 FROM settings WHERE key = ?)",
             arrayOf(key)
@@ -173,7 +154,7 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
             exists = cursor.getInt(0) == 1
         }
         cursor.close()
-        return exists
+        exists
     }
 
     private fun cursorToPasswordEntity(cursor: Cursor): PasswordEntity {
