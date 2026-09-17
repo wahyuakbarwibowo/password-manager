@@ -53,6 +53,20 @@ class PasswordListViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
+    /**
+     * List rows carry no secrets; decrypt this one entry on demand for quick copy.
+     */
+    fun copyPassword(id: Long, onReady: (String) -> Unit) {
+        viewModelScope.launch {
+            val entry = runCatching { passwordRepository.getPasswordById(id) }.getOrNull()
+            if (entry == null || entry.password.isEmpty()) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Could not read password")
+            } else {
+                onReady(entry.password)
+            }
+        }
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }

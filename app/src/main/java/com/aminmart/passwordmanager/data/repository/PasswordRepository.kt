@@ -9,7 +9,6 @@ import com.aminmart.passwordmanager.domain.model.PasswordEntry
 import com.aminmart.passwordmanager.domain.model.UpdatePasswordInput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -26,13 +25,14 @@ class PasswordRepository @Inject constructor(
 ) {
 
     /**
-     * Get all passwords as a Flow.
-     * Passwords are decrypted when read.
+     * Observe all entries for list display. Secrets are NOT decrypted here:
+     * `password` and `notes` are empty. Use [getPasswordById] for the full
+     * entry so plaintext only exists for the one entry being viewed/copied.
      */
     fun getAllPasswords(): Flow<List<PasswordEntry>> {
         return database.getAllPasswords().map { entities ->
-            entities.map { decryptPassword(it) }
-        }.flowOn(Dispatchers.IO)
+            entities.map { toEntry(it, password = "", notes = "") }
+        }
     }
 
     /**
@@ -139,19 +139,20 @@ class PasswordRepository @Inject constructor(
         } else {
             "" to ""
         }
-
-        return PasswordEntry(
-            id = entity.id,
-            title = entity.title,
-            username = entity.username,
-            password = password,
-            website = entity.website,
-            notes = notes,
-            category = entity.category.toDomainCategory(),
-            createdAt = entity.createdAt,
-            updatedAt = entity.updatedAt
-        )
+        return toEntry(entity, password, notes)
     }
+
+    private fun toEntry(entity: PasswordEntity, password: String, notes: String) = PasswordEntry(
+        id = entity.id,
+        title = entity.title,
+        username = entity.username,
+        password = password,
+        website = entity.website,
+        notes = notes,
+        category = entity.category.toDomainCategory(),
+        createdAt = entity.createdAt,
+        updatedAt = entity.updatedAt
+    )
 }
 
 /**

@@ -28,14 +28,17 @@ fun PasswordListScreen(
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.errorMessage) {
-        if (uiState.errorMessage != null) {
-            viewModel.clearError()
-        }
+        val message = uiState.errorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearError()
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Aminmart Password Manager") },
@@ -101,7 +104,12 @@ fun PasswordListScreen(
                     items(uiState.passwords, key = { it.id }) { password ->
                         PasswordListItem(
                             password = password,
-                            onClick = { onNavigateToDetail(password.id) }
+                            onClick = { onNavigateToDetail(password.id) },
+                            onCopyPassword = {
+                                viewModel.copyPassword(password.id) { plaintext ->
+                                    copyToClipboard(context, plaintext, "Password", isSensitive = true)
+                                }
+                            }
                         )
                     }
                 }
@@ -145,10 +153,9 @@ private fun EmptyPasswordList(isSearching: Boolean, modifier: Modifier = Modifie
 @Composable
 private fun PasswordListItem(
     password: PasswordEntry,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onCopyPassword: () -> Unit
 ) {
-    val context = LocalContext.current
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,11 +207,7 @@ private fun PasswordListItem(
             PasswordCategoryBadge(category = password.category)
 
             // Quick copy — the most common action, without opening the detail screen
-            IconButton(
-                onClick = {
-                    copyToClipboard(context, password.password, "Password", isSensitive = true)
-                }
-            ) {
+            IconButton(onClick = onCopyPassword) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
                     contentDescription = "Copy password",
