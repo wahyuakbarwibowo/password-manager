@@ -7,8 +7,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,8 +32,24 @@ fun AuthScreen(
         ActivityResultContracts.GetContent()
     ) { uri -> uri?.let(viewModel::verifyRecoveryFile) }
 
+    // Once settings are known: prompt biometrics straight away if enabled,
+    // otherwise put the cursor in the password field. Only once per screen
+    // instance so cancelling the prompt doesn't immediately re-open it.
+    var autoPrompted by rememberSaveable { mutableStateOf(false) }
+    val passwordFocus = remember { FocusRequester() }
+    LaunchedEffect(uiState.isLoaded) {
+        if (!uiState.isLoaded || autoPrompted) return@LaunchedEffect
+        autoPrompted = true
+        if (uiState.biometricEnabled && !uiState.needsSetup) {
+            activity?.let(viewModel::authenticateWithBiometric)
+        } else {
+            passwordFocus.requestFocus()
+        }
+    }
+
     AuthScreenContent(
         uiState = uiState,
+        passwordFocus = passwordFocus,
         onMasterPasswordChange = viewModel::onMasterPasswordChange,
         onConfirmPasswordChange = viewModel::onConfirmPasswordChange,
         onAuthenticate = viewModel::authenticate,
@@ -104,6 +123,7 @@ fun AuthScreen(
 @Composable
 private fun AuthScreenContent(
     uiState: AuthUiState,
+    passwordFocus: FocusRequester,
     onMasterPasswordChange: (String) -> Unit,
     onConfirmPasswordChange: (String) -> Unit,
     onAuthenticate: () -> Unit,
@@ -168,7 +188,9 @@ private fun AuthScreenContent(
                 ),
                 keyboardActions = KeyboardActions(onDone = { onAuthenticate() }),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(passwordFocus),
                 isError = uiState.errorMessage != null
             )
 
@@ -217,7 +239,7 @@ private fun AuthScreenContent(
                 }
             }
 
-            if (uiState.biometricAvailable && !uiState.needsSetup && !uiState.isResetMode) {
+            if (uiState.biometricEnabled && !uiState.needsSetup && !uiState.isResetMode) {
                 TextButton(onClick = onBiometricAuth) {
                     Text("Use Biometric Instead")
                 }

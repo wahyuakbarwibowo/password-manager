@@ -20,6 +20,8 @@ import org.json.JSONObject
 import javax.inject.Inject
 
 data class AuthUiState(
+    // False until vault + biometric settings are read; UI waits on this before auto-prompting
+    val isLoaded: Boolean = false,
     val needsSetup: Boolean = true,
     val masterPassword: String = "",
     val confirmPassword: String = "",
@@ -48,23 +50,16 @@ class AuthViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            checkVaultStatus()
-            checkBiometricAvailability()
+            val available = biometricAuthService.isBiometricAvailable(application) == BiometricAvailability.AVAILABLE
+            _uiState.value = _uiState.value.copy(
+                needsSetup = !vaultRepository.isVaultInitialized(),
+                biometricAvailable = available,
+                // Biometric unlock is only offered once the user enabled it in Settings
+                // (which requires the master password); hardware alone is not enough.
+                biometricEnabled = available && vaultRepository.isBiometricEnabled().first(),
+                isLoaded = true
+            )
         }
-    }
-
-    private suspend fun checkVaultStatus() {
-        val isInitialized = vaultRepository.isVaultInitialized()
-        _uiState.value = _uiState.value.copy(
-            needsSetup = !isInitialized
-        )
-    }
-
-    private fun checkBiometricAvailability() {
-        val availability = biometricAuthService.isBiometricAvailable(application)
-        _uiState.value = _uiState.value.copy(
-            biometricAvailable = availability == BiometricAvailability.AVAILABLE
-        )
     }
 
     fun onMasterPasswordChange(password: String) {
@@ -166,8 +161,6 @@ class AuthViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 showForgotDialog = true,
                 hasRecoveryKey = vaultRepository.hasRecoveryKey(),
-                biometricEnabled = _uiState.value.biometricAvailable &&
-                    vaultRepository.isBiometricEnabled().first(),
                 errorMessage = null
             )
         }
@@ -207,6 +200,7 @@ class AuthViewModel @Inject constructor(
     }
 
     fun authenticateWithBiometricForReset(activity: FragmentActivity) {
+        if (!_uiState.value.biometricEnabled) return
         biometricAuthService.authenticate(
             activity = activity,
             title = "Reset Master Password",
@@ -265,6 +259,8 @@ class AuthViewModel @Inject constructor(
     }
 
     fun authenticateWithBiometric(activity: FragmentActivity) {
+        val state = _uiState.value
+        if (!state.biometricEnabled || state.needsSetup || state.isResetMode) return
         biometricAuthService.authenticate(
             activity = activity,
             title = "Unlock Password Manager",
