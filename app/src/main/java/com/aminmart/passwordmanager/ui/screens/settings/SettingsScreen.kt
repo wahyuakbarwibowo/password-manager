@@ -30,6 +30,18 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showAutoLockDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.statusMessage) {
+        val message = uiState.statusMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
+        viewModel.clearStatusMessage()
+    }
+
+    // Once the vault is wiped there is nothing to go "back" to; restart at setup.
+    LaunchedEffect(uiState.vaultDeleted) {
+        if (uiState.vaultDeleted) onLockVault()
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -56,6 +68,7 @@ fun SettingsScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Settings") },
@@ -73,6 +86,10 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (uiState.isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             // Security section
             SettingsSection(title = "Security") {
                 // Biometric toggle
@@ -279,10 +296,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 Button(
-                    onClick = {
-                        viewModel.deleteAllData()
-                        onNavigateBack()
-                    },
+                    onClick = viewModel::deleteAllData,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     )
@@ -296,23 +310,6 @@ fun SettingsScreen(
                 }
             }
         )
-    }
-
-    // Status messages
-    uiState.statusMessage?.let { message ->
-        Snackbar(
-            modifier = Modifier.padding(16.dp),
-            action = {
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
-        ) {
-            Text(message)
-        }
     }
 }
 

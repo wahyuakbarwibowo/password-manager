@@ -23,6 +23,8 @@ data class SettingsUiState(
     val statusMessage: String? = null,
     val showChangePasswordDialog: Boolean = false,
     val showDeleteConfirmDialog: Boolean = false,
+    // Set once the vault is wiped; the screen then returns to the setup flow
+    val vaultDeleted: Boolean = false,
     val showPasswordDialogForBiometric: Boolean = false,
     val showPasswordDialogForExport: Boolean = false,
     val showPasswordDialogForImport: Boolean = false,
@@ -378,7 +380,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     showDeleteConfirmDialog = false,
-                    statusMessage = "All data deleted"
+                    vaultDeleted = true
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
