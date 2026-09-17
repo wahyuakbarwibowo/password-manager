@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aminmart.passwordmanager.ui.components.PasswordCategoryBadge
 import com.aminmart.passwordmanager.ui.components.copyToClipboard
+import com.aminmart.passwordmanager.ui.components.icon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +95,7 @@ fun PasswordDetailScreen(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
-                                text = getCategoryIcon(password.category),
+                                text = password.category.icon,
                                 style = MaterialTheme.typography.headlineSmall
                             )
                         }
@@ -242,16 +243,4 @@ private fun formatTimestamp(timestamp: Long): String {
     val dateTime = java.time.LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
     val formatter = java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy HH:mm")
     return dateTime.format(formatter)
-}
-
-private fun getCategoryIcon(category: com.aminmart.passwordmanager.domain.model.PasswordCategory): String {
-    return when (category) {
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.SOCIAL -> "📱"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.EMAIL -> "📧"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.SHOPPING -> "🛒"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.FINANCE -> "💰"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.ENTERTAINMENT -> "🎬"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.WORK -> "💼"
-        com.aminmart.passwordmanager.domain.model.PasswordCategory.OTHER -> "🔐"
-    }
 }

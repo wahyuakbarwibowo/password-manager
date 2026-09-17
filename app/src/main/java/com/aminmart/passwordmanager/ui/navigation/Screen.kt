@@ -1,7 +1,6 @@
 package com.aminmart.passwordmanager.ui.navigation
 
 sealed class Screen(val route: String) {
-    object Splash : Screen("splash")
     object Auth : Screen("auth")
     object PasswordList : Screen("password_list")
     object PasswordDetail : Screen("password_detail/{passwordId}") {

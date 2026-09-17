@@ -63,19 +63,6 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
         return entity
     }
 
-    fun searchPasswords(query: String): Flow<List<PasswordEntity>> = flow {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery(
-            "SELECT * FROM passwords WHERE title LIKE ? OR username LIKE ? OR website LIKE ? OR category LIKE ? ORDER BY updatedAt DESC",
-            arrayOf("%$query%", "%$query%", "%$query%", "%$query%")
-        )
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        emit(list)
-    }
-
     suspend fun insertPassword(password: PasswordEntity): Long {
         val values = ContentValues().apply {
             put("title", password.title)
@@ -115,19 +102,6 @@ class PasswordDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NA
 
     suspend fun deletePasswordById(id: Long) {
         database.delete(TABLE_PASSWORDS, "id = ?", arrayOf(id.toString()))
-    }
-
-    suspend fun getAllEncryptedPasswords(): List<PasswordEntity> {
-        val list = mutableListOf<PasswordEntity>()
-        val cursor = database.rawQuery(
-            "SELECT * FROM passwords WHERE ciphertext IS NOT NULL AND nonce IS NOT NULL",
-            null
-        )
-        while (cursor.moveToNext()) {
-            list.add(cursorToPasswordEntity(cursor))
-        }
-        cursor.close()
-        return list
     }
 
     // Settings operations

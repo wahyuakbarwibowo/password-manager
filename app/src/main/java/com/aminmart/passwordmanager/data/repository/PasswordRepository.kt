@@ -33,16 +33,6 @@ class PasswordRepository @Inject constructor(
     }
 
     /**
-     * Search passwords by query.
-     */
-    fun searchPasswords(query: String): Flow<List<PasswordEntry>> {
-        val searchQuery = "%$query%"
-        return database.searchPasswords(searchQuery).map { entities ->
-            entities.map { decryptPassword(it) }
-        }
-    }
-
-    /**
      * Get all passwords as a decrypted snapshot (for backup export).
      */
     suspend fun getAllPasswordsList(): List<PasswordEntry> {

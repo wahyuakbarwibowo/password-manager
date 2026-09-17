@@ -19,6 +19,7 @@ import com.aminmart.passwordmanager.domain.model.PasswordCategory
 import com.aminmart.passwordmanager.ui.components.FormActions
 import com.aminmart.passwordmanager.ui.components.PasswordTextField
 import com.aminmart.passwordmanager.ui.components.RegularTextField
+import com.aminmart.passwordmanager.ui.components.displayName
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -211,14 +212,3 @@ private fun PasswordStrengthIndicator(strength: com.aminmart.passwordmanager.dat
         )
     }
 }
-
-private val PasswordCategory.displayName: String
-    get() = when (this) {
-        PasswordCategory.SOCIAL -> "Social"
-        PasswordCategory.EMAIL -> "Email"
-        PasswordCategory.SHOPPING -> "Shopping"
-        PasswordCategory.FINANCE -> "Finance"
-        PasswordCategory.ENTERTAINMENT -> "Entertainment"
-        PasswordCategory.WORK -> "Work"
-        PasswordCategory.OTHER -> "Other"
-    }

@@ -8,15 +8,12 @@
 -dontobfuscate
 
 # ===========================================
-# Google Error Prone Annotations (missing from Tink)
-# ===========================================
--dontwarn com.google.errorprone.annotations.**
-
-# ===========================================
 # Hilt (Dependency Injection)
 # ===========================================
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
+-keep class hilt_aggregated_deps.** { *; }
+-keep class * extends dagger.hilt.android.AndroidEntryPoint { *; }
 -keep class * extends dagger.hilt.android.internal.managers.ComponentSupplier { *; }
 -keep class * extends dagger.hilt.android.internal.lifecycle.HiltViewModelFactory { *; }
 -keep class dagger.hilt.android.internal.managers.ViewComponentManager$FragmentContextWrapper { *; }
@@ -27,6 +24,7 @@
 # ===========================================
 -keep class kotlin.Metadata { *; }
 -dontwarn kotlin.**
+-keepattributes *Annotation*, InnerClasses
 -keepclassmembers class **$WhenMappings {
     <fields>;
 }
@@ -34,48 +32,10 @@
     public <methods>;
 }
 
-# Keep Kotlin Serialization
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.AnnotationsKt
-
--keepclassmembers class com.aminmart.passwordmanager.data.repository.**$* {
-    *** Companion;
-}
--keepclassmembers class com.aminmart.passwordmanager.data.repository.** {
-    *** Companion;
-}
--keep class com.aminmart.passwordmanager.data.repository.BackupFileV1 { *; }
--keep class com.aminmart.passwordmanager.data.repository.BackupPayloadV1 { *; }
--keep class com.aminmart.passwordmanager.data.repository.PasswordBackupItem { *; }
-
-# ===========================================
-# Kotlinx Serialization
-# ===========================================
--keepattributes *Annotation*, InnerClasses
--dontnote kotlinx.serialization.AnnotationsKt
--keep class kotlinx.serialization.json.** { *; }
--dontwarn kotlinx.serialization.json.**
--dontwarn kotlinx.serialization.internal.**
-
-# ===========================================
-# AndroidX Security Crypto
-# ===========================================
--keep class androidx.security.crypto.** { *; }
--keep class androidx.security.** { *; }
-
 # ===========================================
 # Biometric
 # ===========================================
 -keep class androidx.biometric.** { *; }
-
-# ===========================================
-# Hilt Generated Classes
-# ===========================================
--keep class dagger.hilt.** { *; }
--keep class hilt_aggregated_deps.** { *; }
--keep class * extends dagger.hilt.android.AndroidEntryPoint { *; }
--keep class * extends dagger.hilt.android.internal.lifecycle.HiltViewModelFactory { *; }
--keep class * extends dagger.hilt.android.internal.managers.ComponentSupplier { *; }
 
 # ===========================================
 # Keep model classes
